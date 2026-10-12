@@ -43,14 +43,12 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // സ്റ്റാറ്റസ് ബാർ ഡിസൈൻ
         getWindow().setStatusBarColor(Color.WHITE);
         getWindow().setNavigationBarColor(Color.WHITE);
         getWindow().getDecorView().setSystemUiVisibility(
                 android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
         );
 
-        // മൈക്രോഫോൺ പെർമിഷൻ പരിശോധിക്കുന്നു
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 101);
         }
@@ -65,7 +63,6 @@ public class MainActivity extends Activity {
 
         scrollView.addView(layout);
 
-        // ലോഗോ
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.reyan_logo);
         logo.setAdjustViewBounds(true);
@@ -76,7 +73,6 @@ public class MainActivity extends Activity {
         logoParams.bottomMargin = 24;
         layout.addView(logo, logoParams);
 
-        // ടൈറ്റിൽ
         TextView title = new TextView(this);
         title.setText("REYAN VOICE");
         title.setTextSize(28);
@@ -85,7 +81,6 @@ public class MainActivity extends Activity {
         title.setTypeface(null, Typeface.BOLD);
         layout.addView(title);
 
-        // സബ്‌ടൈറ്റിൽ
         TextView subtitle = new TextView(this);
         subtitle.setText("നിങ്ങളുടെ സ്വയംഭരണ AI കൂട്ടുകാരൻ");
         subtitle.setTextSize(17);
@@ -94,7 +89,6 @@ public class MainActivity extends Activity {
         subtitle.setPadding(0, 8, 0, 20);
         layout.addView(subtitle);
 
-        // റയാന്റെ മറുപടികൾ കാണിക്കുന്ന ബോക്സ്
         messageText = new TextView(this);
         messageText.setText("ഹരിയേട്ടാ, ഞാൻ കേൾക്കാൻ തയ്യാറാണ്. മൈക്ക് അമർത്തി സംസാരിച്ചോളൂ!");
         messageText.setTextSize(19);
@@ -103,7 +97,6 @@ public class MainActivity extends Activity {
         messageText.setPadding(16, 16, 16, 24);
         layout.addView(messageText);
 
-        // സ്റ്റാറ്റസ് ടെക്സ്റ്റ്
         statusText = new TextView(this);
         statusText.setText("തയ്യാറാണ്...");
         statusText.setTextSize(14);
@@ -112,7 +105,6 @@ public class MainActivity extends Activity {
         statusText.setPadding(0, 0, 0, 20);
         layout.addView(statusText);
 
-        // മൈക്ക് ബട്ടൺ
         micButton = new Button(this);
         micButton.setText("🎤  സംസാരിക്കൂ (Tap to Speak)");
         micButton.setTextSize(18);
@@ -123,7 +115,6 @@ public class MainActivity extends Activity {
 
         setContentView(scrollView);
 
-        // Text-To-Speech ഇൻസ്റ്റാളേഷൻ
         speaker = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
                 int result = speaker.setLanguage(new Locale("ml", "IN"));
@@ -133,7 +124,6 @@ public class MainActivity extends Activity {
             }
         });
 
-        // Speech Recognizer സജ്ജമാക്കുന്നു
         initSpeechRecognizer();
 
         micButton.setOnClickListener(v -> startListening());
@@ -168,4 +158,82 @@ public class MainActivity extends Activity {
     private void startListening() {
         if (speechRecognizer != null) {
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ml-IN");
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ml-IN");
+            intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "റയാനോട് സംസാരിക്കൂ...");
+            speechRecognizer.startListening(intent);
+        } else {
+            Toast.makeText(this, "സ്പീച്ച് റെക്കഗ്നിഷൻ ലഭ്യമല്ല", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void sendQueryToReyanBridge(String query) {
+        new Thread(() -> {
+            try {
+                URL url = new URL(BRIDGE_URL);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json; utf-8");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(3000);
+                conn.setReadTimeout(5000);
+
+                JSONObject jsonInput = new JSONObject();
+                jsonInput.put("query", query);
+
+                try (OutputStream os = conn.getOutputStream()) {
+                    byte[] input = jsonInput.toString().getBytes("utf-8");
+                    os.write(input, 0, input.length);
+                }
+
+                int code = conn.getResponseCode();
+                if (code == 200) {
+                    BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"));
+                    StringBuilder response = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        response.append(line.trim());
+                    }
+
+                    JSONObject resJson = new JSONObject(response.toString());
+                    String reyanReply = resJson.optString("reply", "ഹരിയേട്ടാ, മറുപടി ലഭിച്ചില്ല.");
+
+                    runOnUiThread(() -> {
+                        messageText.setText("റയാൻ: " + reyanReply);
+                        statusText.setText("തയ്യാറാണ്...");
+                        speakOut(reyanReply);
+                    });
+                } else {
+                    runOnUiThread(() -> {
+                        statusText.setText("Termux സെർവർ പ്രതികരിക്കുന്നില്ല!");
+                        speakOut("ഹരിയേട്ടാ, Termux-ൽ സെർവർ ഓൺ ആണോ എന്ന് പരിശോധിക്കുമല്ലോ.");
+                    });
+                }
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    statusText.setText("കണക്ഷൻ പിഴവ്! Termux Server റൺ ചെയ്യുക.");
+                    speakOut("ഹരിയേട്ടാ, ലോക്കൽ സെർവറുമായി ബന്ധപ്പെടാൻ സാധിക്കുന്നില്ല.");
+                });
+            }
+        }).start();
+    }
+
+    private void speakOut(String text) {
+        if (speaker != null) {
+            speaker.speak(text, TextToSpeech.QUEUE_FLUSH, null, "reyan_response");
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (speaker != null) {
+            speaker.stop();
+            speaker.shutdown();
+        }
+        if (speechRecognizer != null) {
+            speechRecognizer.destroy();
+        }
+        super.onDestroy();
+    }
+}
