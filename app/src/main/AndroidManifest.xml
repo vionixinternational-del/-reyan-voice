@@ -1,22 +1,31 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.RECORD_AUDIO" />
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-<application
-    android:allowBackup="true"
-    android:label="Reyan Voice"
-    android:supportsRtl="true"
-    android:theme="@android:style/Theme.Material.Light.NoActionBar">
+    <!-- 1. ശബ്ദം കേൾക്കാനുള്ള മൈക്രോഫോൺ പെർമിഷൻ -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-    <activity
-        android:name=".MainActivity"
-        android:exported="true">
+    <!-- 2. Termux ലോക്കൽ ബ്രിഡ്ജിലേക്ക് (127.0.0.1:8080) കണക്റ്റ് ചെയ്യാനുള്ള പെർമിഷൻ -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
-        <intent-filter>
-            <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.category.LAUNCHER" />
-        </intent-filter>
+    <application
+        android:allowBackup="true"
+        android:label="Reyan Voice"
+        android:icon="@drawable/reyan_logo"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
-    </activity>
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
 
-</application>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+        </activity>
+
+    </application>
 
 </manifest>
